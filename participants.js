@@ -5,6 +5,9 @@ const sharp = require("sharp");
 
 const magic = require("./magic");
 
+const ATTENDING_YES = "Kyllä / Yes";
+const ATTENDING_NO = "En / No";
+
 function download(uri, filename) {
   return new Promise((resolve) => {
     if (fs.existsSync(filename)) {
@@ -74,8 +77,28 @@ async function getParticipants(csvFile) {
         .map((part) => part.replace(/^"(.+(?="$))"$/, "$1").trim()),
     );
 
+  const uniqueRows = Object.values(rows
+    .reduce((prev, curr) => {
+      const email = curr[1];
+      const attending = curr[3];
+      if (attending === ATTENDING_NO) {
+        const next = { ...prev };
+        delete next[email];
+        return next;
+      }
+
+      if (attending === ATTENDING_YES) {
+        return {
+          ...prev,
+          [email]: curr
+        };
+      }
+
+      return prev;
+    }, {}));
+
   return await Promise.all(
-    rows.map(async (column) => {
+    uniqueRows.map(async (column) => {
       let result;
       try {
         const term = column[2]
