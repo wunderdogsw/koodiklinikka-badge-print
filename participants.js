@@ -78,7 +78,15 @@ async function getParticipants(csvFile) {
     rows.map(async (column) => {
       let result;
       try {
-        const results = await magic.doSearch(column[2].toLowerCase());
+        const term = column[2]
+          .toLowerCase()
+          .replace(/\u00e5/g, 'a') // å -> a
+          .replace(/\u00e4/, 'a')  // ä -> a
+          .replace(/\u00f6/, 'o')  // ö -> o
+          .replace(/\s+/g, ' ')
+          .replace(/[^a-z ]/g, '');
+
+        const results = await magic.doSearch(term);
         if (results && results[0]) {
           result = results[0];
         }
