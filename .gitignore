@@ -5,3 +5,4 @@ node_modules
 /fonts
 .DS_Store
 magic.json
+overrides.json

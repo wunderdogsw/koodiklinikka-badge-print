@@ -4,6 +4,7 @@ const request = require("request");
 const sharp = require("sharp");
 
 const magic = require("./magic");
+const overrides = require("./overrides");
 
 const ATTENDING_YES = "Kyllä / Yes";
 const ATTENDING_NO = "En / No";
@@ -21,11 +22,13 @@ function download(uri, filename) {
         } else if (!contentLength) {
           resolve();
         } else {
-          const stream = fs.createWriteStream(filename);
+          const prefix = contentType === "image/jpeg" ? "jpg" : "png";
+          const filenameWithPrefix = `${filename}.${prefix}`;
+          const stream = fs.createWriteStream(filenameWithPrefix);
           request(uri)
             .pipe(stream)
             .on("close", () => {
-              resolve(filename);
+              resolve(filenameWithPrefix);
             });
         }
       });
@@ -77,8 +80,8 @@ async function getParticipants(csvFile) {
         .map((part) => part.replace(/^"(.+(?="$))"$/, "$1").trim()),
     );
 
-  const uniqueRows = Object.values(rows
-    .reduce((prev, curr) => {
+  const uniqueRows = Object.values(
+    rows.reduce((prev, curr) => {
       const email = curr[1];
       const attending = curr[3];
       if (attending === ATTENDING_NO) {
@@ -90,12 +93,13 @@ async function getParticipants(csvFile) {
       if (attending === ATTENDING_YES) {
         return {
           ...prev,
-          [email]: curr
+          [email]: curr,
         };
       }
 
       return prev;
-    }, {}));
+    }, {}),
+  );
 
   return await Promise.all(
     uniqueRows.map(async (column) => {
@@ -103,11 +107,11 @@ async function getParticipants(csvFile) {
       try {
         const term = column[2]
           .toLowerCase()
-          .replace(/\u00e5/g, 'a') // å -> a
-          .replace(/\u00e4/, 'a')  // ä -> a
-          .replace(/\u00f6/, 'o')  // ö -> o
-          .replace(/\s+/g, ' ')
-          .replace(/[^a-z ]/g, '');
+          .replace(/\u00e5/g, "a") // å -> a
+          .replace(/\u00e4/, "a") // ä -> a
+          .replace(/\u00f6/, "o") // ö -> o
+          .replace(/\s+/g, " ")
+          .replace(/[^a-z ]/g, "");
 
         const results = await magic.doSearch(term);
         if (results && results[0]) {
@@ -119,20 +123,21 @@ async function getParticipants(csvFile) {
 
       const email = column[1];
 
-      const realName = result?.rn || column[2];
+      const realName = result?.rn || overrides[email]?.realName || column[2];
 
-      let nickName;
-      if (result?.dn && result.dn !== realName) {
-        nickName = result.dn;
+      let nickName = result?.dn || overrides[email]?.nickName;
+      if (nickName === realName) {
+        nickName = undefined;
       }
 
+      const imageUrl =
+        result?.im || (email ? overrides[email]?.image : undefined);
       let image;
-      if (result && result.im) {
+      if (imageUrl) {
         const imageName = realName.toLowerCase().replace(/[^a-z]/g, "");
-        const prefix = result.im.split(".").pop();
         const normalImage = await download(
-          result.im,
-          `${tempImagesDir}/${imageName}.${prefix}`,
+          imageUrl,
+          `${tempImagesDir}/${imageName}`,
         );
         if (normalImage) {
           image = await roundedImage(

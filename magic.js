@@ -1,9 +1,19 @@
 // "magic.js" gotten from Aarni Koskela (@akx)
 // https://github.com/akx
 
-// Database is not supplied, as it contains personal information.
-// If you need it, get it from @akx.
-const db = new Map(require("./magic.json"));
+const fs = require("fs");
+
+function getMagic() {
+  // Database is not supplied, as it contains personal information.
+  // If you need it, get it from @akx.
+  if (fs.existsSync("./magic.json")) {
+    return new Map(require("./magic.json"));
+  }
+
+  return new Map();
+}
+
+const db = getMagic();
 
 function toBase64(buffer) {
   const buf = new Uint8Array(buffer);
